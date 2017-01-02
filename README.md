@@ -88,7 +88,8 @@ Shows midot's exposed API
 midot api
 ```
 
-## Pretty debug messages
+## `midot` API
+### Pretty debug messages
 `midot` exposes some pretty debug message functions
 for you to use throughout your dotfiles:
 
@@ -116,6 +117,9 @@ warn "YOUR WARNING ABOUT A NON-FATAL ERROR HERE"
 ```sh
 fail "YOUR MESSAGE ABOUT A FATAL ERROR HERE"
 ```
+
+### Other API calls
+To see a list of available API calls, please run `midot api`
 
 ## Dependencies
 git:

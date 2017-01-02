@@ -15,29 +15,86 @@ base_url="https://github.com/JasonYao/midot-base.git"
 ##
 # Helper functions
 ##
-# NOTE: These debug functions are
+
+# NOTE: This symlink function is
 # from Holman's repo, which can be found at:
 # https://github.com/holman/dotfiles
-function info () {
-	printf "\r  [ \033[00;34m..\033[0m ] %s\n" "$1"
-}
+function link_file () {
+  local src=$1 dst=$2
 
-function user () {
-	printf "\r  [ \033[0;33m??\033[0m ] %s " "$1"
-}
+  local overwrite='' backup='' skip=''
+  local action=''
 
-function success () {
-	printf "\r\033[2K  [ \033[00;32mOK\033[0m ] %s\n" "$1"
-}
+	if [ -f "$dst" ] || [ -d "$dst" ] || [ -L "$dst" ]
+  then
 
-function warn () {
-	printf "\r\033[2K  [\033[0;31mWARN\033[0m] %s\n" "$1"
-}
+    if [ "$overwrite_all" == "false" ] && [ "$backup_all" == "false" ] && [ "$skip_all" == "false" ]
+    then
+      local currentSrc=$(readlink "$dst")
 
-function fail () {
-	printf "\r\033[2K  [\033[0;31mFAIL\033[0m] %s\n" "$1"
-	echo ''
-	exit 1
+      if [ "$currentSrc" == "$src" ]
+      then
+
+        skip=true;
+
+      else
+
+        user "File already exists: $dst ($(basename "$src")), what do you want to do?
+        [s]kip, [S]kip all, [o]verwrite, [O]verwrite all, [b]ackup, [B]ackup all?"
+        read -rn 1 action
+
+        case "$action" in
+          o )
+            overwrite=true;;
+          O )
+            overwrite_all=true;;
+          b )
+            backup=true;;
+          B )
+            backup_all=true;;
+          s )
+            skip=true;;
+          S )
+            skip_all=true;;
+          * )
+            ;;
+        esac
+
+      fi
+
+    fi
+
+    overwrite=${overwrite:-$overwrite_all}
+    backup=${backup:-$backup_all}
+    skip=${skip:-$skip_all}
+
+    if [ "$overwrite" == "true" ]
+    then
+      rm -rf "$dst"
+      success "Removed $dst"
+    fi
+
+    if [ "$backup" == "true" ]
+    then
+      mv "$dst" "${dst}.backup"
+      success "Moved $dst to ${dst}.backup"
+    fi
+
+    if [ "$skip" == "true" ]
+    then
+      success "Skipped $src"
+    fi
+  fi
+
+  if [ "$skip" != "true" ]  # "false" or empty
+  then
+    ln -s "$1" "$2"
+	if [ "$(uname -s)" == "Linux" ]; then
+		chown -R "$username:$username" "$2"
+	fi
+
+    success "Linked $1 to $2"
+  fi
 }
 
 function sanity_check() {
@@ -62,15 +119,6 @@ function remove_symlinks() {
 	# TODO make this function go through all symlinks in the home and remove them
 	echo "TODO removing symlinks"
 }
-
-
-# Exposes some pretty debug functions
-# for midot-compliant dotfiles to use
-export -f info
-export -f user
-export -f success
-export -f warn
-export -f fail
 
 ##
 # Dispatching functions
@@ -300,6 +348,18 @@ function version() {
 
 function api() {
 	echo "Midot's exposed API functions for dotfiles internal use:"
+
+	echo ""
+	printf "\tGeneral:\n"
+	printf "\t\trm_dir:\t\tTakes a single string argument representing the directory path, and removes the directory\n"
+	printf "\t\tsymlink_all:\tTakes an optional int value, representing the depth at which to stop (default is 3)\n"
+
+	echo ""
+	printf "\tGit:\n"
+	printf "\t\tset_git:\tTakes a git config key, and a git config value as arguments\n"
+	printf "\t\t└──e.g. set_git user.name \"Your Name Here\"\n"
+
+	echo ""
 	printf "\tPretty debug messages:\n"
 	printf "\t\tinfo:\t\tTakes a single string argument, used to notify the user that a checkpoint has passed\n"
 	printf "\t\tuser:\t\tTakes a single string argument, used to prompt the user for input\n"
@@ -307,6 +367,138 @@ function api() {
 	printf "\t\twarn:\t\tTakes a single string argument, used to notify the user of a non-fatal, failed action\n"
 	printf "\t\tfail:\t\tTakes a single string argument, used to notify the user of a fatal, failed action\n"
 }
+
+##
+# Public API functions
+##
+
+# General
+function rm_dir() {
+	# Removes a given directory
+	if rm -rf "$1" ; then
+		success "Removed $1 directory"
+	else
+		fail "Failed to remove $1 directory"
+	fi
+}
+
+# NOTE: This symlink function is
+# from Holman's repo, which can be found at:
+# https://github.com/holman/dotfiles
+function symlink_all () {
+	# TODO check for a better way to test for existence of an argument
+	if [ "$1" != "" ]; then
+		max_depth=$1
+	else
+		max_depth=3
+	fi
+
+	info 'Installing dotfiles'
+	local overwrite_all=false backup_all=false skip_all=false
+
+	for src in $(find -H "$dotfilesDirectory" -maxdepth $max_depth -name '*.symlink')
+	do
+		dst="$HOME/.$(basename "${src%.*}")"
+		link_file "$src" "$dst"
+	done
+}
+
+# Git
+function set_git() {
+	# Sets a git configuration value
+	if [[ $(git config -l | grep "$1" | grep "$2") == "" ]]; then
+		git config --global "$1" "$2"
+		success "Git: Set $1 to $2"
+	else
+		success "Git: $1 has already been set to $2"
+	fi
+}
+
+# Debug
+# NOTE: These debug functions are
+# from Holman's repo, which can be found at:
+# https://github.com/holman/dotfiles
+function info () {
+	printf "\r  [ \033[00;34m..\033[0m ] %s\n" "$1"
+}
+
+function user () {
+	printf "\r  [ \033[0;33m??\033[0m ] %s " "$1"
+}
+
+function success () {
+	printf "\r\033[2K  [ \033[00;32mOK\033[0m ] %s\n" "$1"
+}
+
+function warn () {
+	printf "\r\033[2K  [\033[0;31mWARN\033[0m] %s\n" "$1"
+}
+
+function fail () {
+	printf "\r\033[2K  [\033[0;31mFAIL\033[0m] %s\n" "$1"
+	echo ''
+	exit 1
+}
+
+# Homebrew
+function brew_update() {
+	info "Homebrew: Updating brews now"
+	if brew update; then
+		success  "Homebrew: Brews have been updated"
+	else
+		fail "Homebrew: Brews failed to be updated"
+	fi
+}
+
+function brew_upgrade() {
+	info "Homebrew: Upgrading brews now"
+	if brew upgrade; then
+		success "Homebrew: Brews have been upgraded"
+	else
+		fail "Homebrew: Brews failed to upgrade"
+	fi
+}
+
+function brew_check() {
+	if test ! "$(which brew)" ; then
+		info "Homebrew: Package manager was not found, installing now"
+		/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+		success "Homebrew: successfully installed"
+	fi
+}
+
+function brew_check_package() {
+	if [[ $(brew list | grep "$1") == "" ]]; then
+		info "Homebrew: Package $1 has not been installed yet, installing now"
+		brew tap homebrew/dupes
+		if brew install "$1" ${flagged_packages[$1]} &> /dev/null ; then
+			success "Homebrew: Package $1 is now installed"
+		else
+			fail "Homebrew: Package $1 failed to install"
+		fi
+	else
+		success "Homebrew: Package $1 is already installed"
+	fi
+}
+
+# Exposes the API publically
+# so that users may call these
+# functions in their own dotfiles
+export -f rm_dir
+export -f symlink_all
+
+export -f set_git
+
+export -f info
+export -f user
+export -f success
+export -f warn
+export -f fail
+
+export -f brew_update
+export -f brew_upgrade
+export -f brew_check
+export -f brew_check_package
 
 # Actually calls and dispatches the functions as necessary
 check_flags $1
