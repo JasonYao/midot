@@ -41,7 +41,11 @@ function check_and_run() {
 	# $1 = the string prefix ("pre" or "post")
 	# $2 = the function to check (e.g. "update" or "upgrade")
 	if [[ -f "$dotfiles_directory"/bin/"$1"-"$2" ]]; then
-		"$dotfiles_directory"/bin/"$1"-"$2"
+		if "$dotfiles_directory"/bin/"$1"-"$2" ; then
+			success "midot: $1-$2 script completed successfully"
+		else
+			fail "midot: $1-$2 script failed to complete"
+		fi
 	fi
 }
 
@@ -49,12 +53,13 @@ function check_and_run() {
 # Dispatching functions
 ##
 function check_flags() {
-	# Checks if the passed in parameter is valid
+	# Checks if the passed-in parameter is valid
 	case "$1" in
 		update|upgrade|help|*.git|uninstall|generate|check|version)
 		;;
+
 		*)
-		fail "midot: Invalid argument passed in"
+		fail "midot: Invalid argument passed in";
 		exit 1;
 		;;
 	esac
@@ -96,7 +101,6 @@ function dispatch() {
 
 		*)
 		fail "Invalid argument passed in";
-		exit 1;
 		;;
 	esac
 }
@@ -113,7 +117,7 @@ function update() {
 
 	info "midot: Updating dotfiles now"
 	if git -C "$dotfiles_directory" pull --quiet && git -C "$dotfiles_directory" submodule update --remote &> /dev/null; then
-		new_version="$(git -C "$dotfilesDirectory" log -1 | grep "commit")"
+		new_version="$(git -C "$dotfilesDirectory" log -1 | grep "commit")" # TODO find a less-hacky way to do this
 		success "midot: Dotfiles are now updated to: $new_version"
 	else
 		fail "midot: Dotfiles failed to be updated"
@@ -174,6 +178,12 @@ function set() {
 
 function install() {
 	# Installs the dotfiles from a set git URL
+
+	# Sanity check
+	if [[ -d "$dotfiles_directory" ]]; then
+		fail "midot: Dotfiles are already installed, please run `midot uninstall` first, then `midot install`"
+	fi
+
 	info "midot: Installing dotfiles now"
 	if git clone --recursive "$(head -n 1 "$HOME"/.midot)" "$dotfilesDirectory" &> /dev/null; then
 		success "midot: Dotfiles downloaded successfully"
@@ -183,6 +193,8 @@ function install() {
 }
 
 function uninstall() {
+	sanity_check
+
 	# Uninstalls the given dotfiles, and cleans up any lingering mess
 	info "midot: Uninstalling dotfiles now"
 	if [[ -f "$dotfiles_directory"/bin/uninstall ]]; then
@@ -213,13 +225,12 @@ function uninstall() {
 }
 
 function generate() {
-	info "midot: Downloading base dotfiles to $dotfiles_directory now"
-
 	# Sanity check
 	if [[ -d "$dotfilesDirectory" ]]; then
 		fail "midot: Dotfiles are already in place, to replace with the default dotfiles, please run `midot uninstall`, then `midot generate` again"
 	fi
 
+	info "midot: Downloading base dotfiles to $dotfiles_directory now"
 	if set "$base_url" ; then
 		success "midot: Base dotfiles have now been downloaded to $dotfiles_directory"
 	else
