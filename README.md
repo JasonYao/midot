@@ -2,9 +2,20 @@
 By [Jason Yao](https://github.com/JasonYao)
 
 ## Description
-`midot` is a dotfiles interface and generator
-that exposes a clean way to build, maintain,
-and update dotfiles globally from the commandline.
+`midot` is a dotfiles interface built to
+make dotfiles easier to build, maintain,
+and upgrade via global commands.
+
+By complying with the `midot` interface,
+you gain for free simple, yet powerful,
+global commands to control your dotfiles
+from anywhere.
+
+To jump-start this process, you can take
+a look at a basic `midot`-compliant dotfile
+[here](https://github.com/JasonYao/midot-base.git),
+or simply run `midot generate` and follow the
+given instructions.
 
 ## Setup
 For now:
@@ -81,8 +92,8 @@ brew install git
 ## How to build `midot`-compliant dotfiles
 Building `midot`-compliant dotfiles is a relatively
 simple matter. You can use the built in `generate`
-command to build a baseline dotfiles, or manually
-do the following:
+command to download a basic `midot`-compliant set of dotfiles, 
+or manually do the following:
 - Have a `bin` folder inside of your dotfiles
 	- If you want to have scripts run pre/post commands, place them here. e.g. `bin/pre-update`
 	- Have an `upgrade` script. This should be your "start" script, able to be run consecutively.

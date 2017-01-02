@@ -1,0 +1,256 @@
+#!/usr/bin/env bash
+
+##
+# Github repo here: https://github.com/JasonYao/midot
+##
+
+set -e
+
+##
+# Constants
+##
+dotfiles_directory="$HOME/.dotfiles"
+base_url="https://github.com/JasonYao/midot-base.git"
+
+##
+# Helper functions
+##
+function info () {
+	printf "\r  [ \033[00;34m..\033[0m ] %s\n" "$1"
+}
+function user () {
+	printf "\r  [ \033[0;33m??\033[0m ] %s " "$1"
+}
+function success () {
+	printf "\r\033[2K  [ \033[00;32mOK\033[0m ] %s\n" "$1"
+}
+function warn () {
+	printf "\r\033[2K  [\033[0;31mWARN\033[0m] %s\n" "$1"
+}
+function fail () {
+	printf "\r\033[2K  [\033[0;31mFAIL\033[0m] %s\n" "$1"
+	echo ''
+	exit 1
+}
+function sanity_check() {
+	if [[ ! -d "$dotfiles_directory" ]]; then
+		fail "midot: Dotfiles do not appear to be installed, please run `midot install`"
+	fi
+}
+function check_and_run() {
+	# $1 = the string prefix ("pre" or "post")
+	# $2 = the function to check (e.g. "update" or "upgrade")
+	if [[ -f "$dotfiles_directory"/bin/"$1"-"$2" ]]; then
+		"$dotfiles_directory"/bin/"$1"-"$2"
+	fi
+}
+
+##
+# Dispatching functions
+##
+function check_flags() {
+	# Checks if the passed in parameter is valid
+	case "$1" in
+		update|upgrade|help|*.git|uninstall|generate|check|version)
+		;;
+		*)
+		fail "midot: Invalid argument passed in"
+		exit 1;
+		;;
+	esac
+}
+
+function dispatch() {
+	case "$1" in
+		update)
+		update;
+		;;
+
+		upgrade)
+		upgrade;
+		;;
+
+		help)
+		help;
+		;;
+
+		*.git)
+		set $1;
+		;;
+
+		uninstall)
+		uninstall;
+		;;
+
+		generate)
+		generate;
+		;;
+
+		check)
+		check;
+		;;
+
+		version)
+		version;
+		;;
+
+		*)
+		fail "Invalid argument passed in";
+		exit 1;
+		;;
+	esac
+}
+
+##
+# Interface functions
+##
+
+function update() {
+	sanity_check
+
+	# Runs the pre-update script if found
+	check_and_run "pre" "update"
+
+	info "midot: Updating dotfiles now"
+	if git -C "$dotfiles_directory" pull --quiet && git -C "$dotfiles_directory" submodule update --remote &> /dev/null; then
+		new_version="$(git -C "$dotfilesDirectory" log -1 | grep "commit")"
+		success "midot: Dotfiles are now updated to: $new_version"
+	else
+		fail "midot: Dotfiles failed to be updated"
+	fi
+
+	# Runs the post-update script if found
+	check_and_run "post" "update"
+}
+
+function upgrade() {
+	sanity_check
+
+	# Additional sanity checks
+	if [[ ! -f "$dotfiles_directory"/bin/upgrade ]]; then
+		fail "midot: `bin/upgrade` script appears to be missing from your dotfiles- please fix in your dotfiles and then run `midot check` to validate midot compliance"
+	fi
+
+	# Runs the pre-upgrade script if found
+	check_and_run "pre" "upgrade"
+
+	info "midot: Upgrading dotfiles now"
+	if "$dotfiles_directory"/bin/upgrade ; then
+		success "midot: Upgraded dotfiles"
+	else
+		fail "midot: Failed to upgrade dotfiles"
+	fi
+
+	# Runs the post-upgrade script if found
+	check_and_run "post" "upgrade"
+}
+
+function help() {
+	echo "midot commands:"
+	printf "\tupdate:\t\tUpdates the current dotfiles build to the latest master branch\n"
+	printf "\tupgrade:\tUpgrades the current dotfiles build (sets up/removes new/old symlinks, config files, etc.)\n"
+	printf "\thelp:\t\tSee this help menu\n"
+	printf "\tDOTFILE_URL:\tSets the midot dotfiles URL. If it is the very first time set, downloads & installs the dotfiles\n"
+	printf "\tuninstall:\tCleanly uninstalls the dotfiles\n"
+	printf "\tgenerate:\tGenerates a default set of dotfiles into $HOME/.dotfiles\n"
+	printf "\tcheck:\t\tChecks to see that the given dotfiles complies with the midot interface\n"
+	printf "\tversion:\tPrints out the current midot version & dotfiles version if available\n"
+	exit 0
+}
+
+function set() {
+	info "midot: Setting dotfiles remote URL to: $1"
+
+	if [[ ! -f "$HOME"/.midot ]]; then
+		# First time running, so downloads & installs the dotfiles
+		echo "$1" > "$HOME"/.midot
+		install
+		upgrade
+	else
+		# Not the first time running, checks if the same. If not, ask for override, then for uninstall + re-install
+		# TODO implement this after figuring out how to get user input
+	fi
+}
+
+function install() {
+	# Installs the dotfiles from a set git URL
+	info "midot: Installing dotfiles now"
+	if git clone --recursive "$(head -n 1 "$HOME"/.midot)" "$dotfilesDirectory" &> /dev/null; then
+		success "midot: Dotfiles downloaded successfully"
+	else
+		fail "midot: Dotfiles failed to be downloaded"
+	fi
+}
+
+function uninstall() {
+	# Uninstalls the given dotfiles, and cleans up any lingering mess
+	info "midot: Uninstalling dotfiles now"
+	if [[ -f "$dotfiles_directory"/bin/uninstall ]]; then
+		if "$dotfiles_directory"/bin/uninstall ; then
+			success "midot: Dotfiles uninstall clean-up is now complete"
+		else
+			fail "midot: Dotfiles uninstall clean-up failed to complete"
+		fi
+	else
+		fail "midot: `bin/uninstall` script was not found, please add it to your dotfiles, and then run `midot check` to validate midot compliance"
+	fi
+
+	# Removes the .midot config file
+	if [[ -f "$HOME"/.midot ]]; then
+		if rm "$HOME"/.midot ; then
+			success "midot: .midot config file now removed"
+		else
+			fail "midot: .midot config file failed to be removed, please check your file permissions"
+		fi
+	fi
+
+	# Removes the dotfiles directory
+	if rm -rf "$dotfiles_directory" ; then
+		success "midot: Dotfiles directory is now removed"
+	else
+		fail "midot: Dotfiles directory failed to be removed, please check your permissions"
+	fi
+}
+
+function generate() {
+	info "midot: Downloading base dotfiles to $dotfiles_directory now"
+
+	# Sanity check
+	if [[ -d "$dotfilesDirectory" ]]; then
+		fail "midot: Dotfiles are already in place, to replace with the default dotfiles, please run `midot uninstall`, then `midot generate` again"
+	fi
+
+	if set "$base_url" ; then
+		success "midot: Base dotfiles have now been downloaded to $dotfiles_directory"
+	else
+		fail "midot: Base dotfiles failed to be downloaded to $dotfiles_directory"
+	fi
+}
+
+function check() {
+	# Checks whether the current dotfiles are midot-compliant
+	sanity_check
+
+	if [[ ! -d "$dotfiles_directory"/bin ]]; then
+		fail "midot: COMPLIANCE ERROR- no `bin` directory found"
+	fi
+
+	if [[ ! -f "$dotfiles_directory"/upgrade ]]; then
+		fail "midot: COMPLIANCE ERROR- no `bin/upgrade` script found"
+	fi
+
+	if [[ ! -f "$dotfiles_directory"/uninstall ]]; then
+		fail "midot: COMPLIANCE ERROR- no `bin/uninstall` script found"
+	fi
+
+	success "midot: Dotfiles are in compliance with the midot interface"
+}
+
+function version() {
+	#TODO add in a way to use latest git tag to show midot version, and for the dotfiles version
+	echo "version"
+}
+
+# Actually calls and dispatches the functions as necessary
+check_flags $1
+dispatch $1
