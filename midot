@@ -15,28 +15,37 @@ base_url="https://github.com/JasonYao/midot-base.git"
 ##
 # Helper functions
 ##
+# NOTE: These debug functions are
+# from Holman's repo, which can be found at:
+# https://github.com/holman/dotfiles
 function info () {
 	printf "\r  [ \033[00;34m..\033[0m ] %s\n" "$1"
 }
+
 function user () {
 	printf "\r  [ \033[0;33m??\033[0m ] %s " "$1"
 }
+
 function success () {
 	printf "\r\033[2K  [ \033[00;32mOK\033[0m ] %s\n" "$1"
 }
+
 function warn () {
 	printf "\r\033[2K  [\033[0;31mWARN\033[0m] %s\n" "$1"
 }
+
 function fail () {
 	printf "\r\033[2K  [\033[0;31mFAIL\033[0m] %s\n" "$1"
 	echo ''
 	exit 1
 }
+
 function sanity_check() {
 	if [[ ! -d "$dotfiles_directory" ]]; then
 		fail "midot: Dotfiles do not appear to be installed, please run `midot install`"
 	fi
 }
+
 function check_and_run() {
 	# $1 = the string prefix ("pre" or "post")
 	# $2 = the function to check (e.g. "update" or "upgrade")
@@ -49,13 +58,27 @@ function check_and_run() {
 	fi
 }
 
+function remove_symlinks() {
+	# TODO make this function go through all symlinks in the home and remove them
+	echo "TODO removing symlinks"
+}
+
+
+# Exposes some pretty debug functions
+# for midot-compliant dotfiles to use
+export -f info
+export -f user
+export -f success
+export -f warn
+export -f fail
+
 ##
 # Dispatching functions
 ##
 function check_flags() {
 	# Checks if the passed-in parameter is valid
 	case "$1" in
-		update|upgrade|help|*.git|uninstall|generate|check|version)
+		update|upgrade|help|*.git|uninstall|generate|check|version|api)
 		;;
 
 		*)
@@ -97,6 +120,10 @@ function dispatch() {
 
 		version)
 		version;
+		;;
+
+		api)
+		api;
 		;;
 
 		*)
@@ -159,6 +186,7 @@ function help() {
 	printf "\tgenerate:\tGenerates a default set of dotfiles into $HOME/.dotfiles\n"
 	printf "\tcheck:\t\tChecks to see that the given dotfiles complies with the midot interface\n"
 	printf "\tversion:\tPrints out the current midot version & dotfiles version if available\n"
+	printf "\tapi\t\tPrints out midot's exposed API functions"
 	exit 0
 }
 
@@ -173,6 +201,7 @@ function set() {
 	else
 		# Not the first time running, checks if the same. If not, ask for override, then for uninstall + re-install
 		# TODO implement this after figuring out how to get user input
+		echo "Ask for permission"
 	fi
 }
 
@@ -222,6 +251,13 @@ function uninstall() {
 	else
 		fail "midot: Dotfiles directory failed to be removed, please check your permissions"
 	fi
+
+	# Removes all symlinks in the HOME directory pointing to the dotfiles
+	if remove_symlinks ; then
+		success "midot: Orphaned symlinks are now removed"
+	else
+		fail "midot: Failed to remove orphaned symlinks"
+	fi
 }
 
 function generate() {
@@ -246,11 +282,11 @@ function check() {
 		fail "midot: COMPLIANCE ERROR- no `bin` directory found"
 	fi
 
-	if [[ ! -f "$dotfiles_directory"/upgrade ]]; then
+	if [[ ! -f "$dotfiles_directory"/bin/upgrade ]]; then
 		fail "midot: COMPLIANCE ERROR- no `bin/upgrade` script found"
 	fi
 
-	if [[ ! -f "$dotfiles_directory"/uninstall ]]; then
+	if [[ ! -f "$dotfiles_directory"/bin/uninstall ]]; then
 		fail "midot: COMPLIANCE ERROR- no `bin/uninstall` script found"
 	fi
 
@@ -260,6 +296,16 @@ function check() {
 function version() {
 	#TODO add in a way to use latest git tag to show midot version, and for the dotfiles version
 	echo "version"
+}
+
+function api() {
+	echo "Midot's exposed API functions for dotfiles internal use:"
+	printf "\tPretty debug messages:\n"
+	printf "\t\tinfo:\t\tTakes a single string argument, used to notify the user that a checkpoint has passed\n"
+	printf "\t\tuser:\t\tTakes a single string argument, used to prompt the user for input\n"
+	printf "\t\tsuccess:\tTakes a single string argument, used to notify the user of a successful action\n"
+	printf "\t\twarn:\t\tTakes a single string argument, used to notify the user of a non-fatal, failed action\n"
+	printf "\t\tfail:\t\tTakes a single string argument, used to notify the user of a fatal, failed action\n"
 }
 
 # Actually calls and dispatches the functions as necessary
