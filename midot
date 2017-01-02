@@ -366,6 +366,8 @@ function api() {
 	printf "\t\tsuccess:\tTakes a single string argument, used to notify the user of a successful action\n"
 	printf "\t\twarn:\t\tTakes a single string argument, used to notify the user of a non-fatal, failed action\n"
 	printf "\t\tfail:\t\tTakes a single string argument, used to notify the user of a fatal, failed action\n"
+
+	exit 0
 }
 
 ##

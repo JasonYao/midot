@@ -9,7 +9,10 @@ and upgrade via global commands.
 By complying with the `midot` interface,
 you gain for free simple, yet powerful,
 global commands to control your dotfiles
-from anywhere.
+from anywhere. For example, any file
+ending with a `.symlink` will be
+symlinked to the `$HOME` directory via
+`midot`'s `symlink_all` call.
 
 To jump-start this process, you can take
 a look at a basic `midot`-compliant dotfile
@@ -89,37 +92,8 @@ midot api
 ```
 
 ## `midot` API
-### Pretty debug messages
-`midot` exposes some pretty debug message functions
-for you to use throughout your dotfiles:
-
-- `info`
-```sh
-info "YOUR MESSAGE ABOUT PASSING A CHECKPOINT HERE"
-```
-
-- `user`
-```sh
-user "YOUR PROMPT TO RECEIVE USER INPUT HERE"
-```
-
-- `success`
-```sh
-success "YOUR SUCCESSFUL COMPLETION MESSAGE HERE"
-```
-
-- `warn`
-```sh
-warn "YOUR WARNING ABOUT A NON-FATAL ERROR HERE"
-```
-
-- `fail`
-```sh
-fail "YOUR MESSAGE ABOUT A FATAL ERROR HERE"
-```
-
-### Other API calls
-To see a list of available API calls, please run `midot api`
+For more information and examples, please see
+the [API](API.md) file.
 
 ## Dependencies
 git:
